@@ -40,7 +40,7 @@ def encode_image_to_base64(image_bytes: bytes) -> str:
 
 def fetch_and_encode_web_image(image_url: str) -> Union[str, None]:
     """Fetches an image from a URL and encodes it to a base64 string."""
-    print(f"Fetching and encoding web image from URL: {image_url}") # For console debugging
+    #print(f"Fetching and encoding web image from URL: {image_url}") # For console debugging
     try:
         response = httpx.get(image_url, follow_redirects=True, timeout=10)
         response.raise_for_status()

@@ -86,6 +86,9 @@ if "file_uploader_key" not in st.session_state:
 # Session state for graph visibility
 if "show_graph" not in st.session_state:
     st.session_state.show_graph = True # Default to True to show graph by default
+# NEW: Session state for explicit model selection
+if "selected_model_type" not in st.session_state:
+    st.session_state.selected_model_type = "Auto-route"
 
 
 # --- Display Chat Messages ---
@@ -228,6 +231,17 @@ if user_query:
     # Update the Langgraph conversation state with the new user message
     st.session_state.conversation_state["messages"].append(HumanMessage(content=final_human_message_content))
 
+    # Set the model_choice based on radio button selection
+    if st.session_state.selected_model_type == "Auto-route":
+        st.session_state.conversation_state["model_choice"] = "auto"
+    elif st.session_state.selected_model_type == "Text Model":
+        st.session_state.conversation_state["model_choice"] = "text"
+    elif st.session_state.selected_model_type == "Vision Model":
+        st.session_state.conversation_state["model_choice"] = "vision"
+    elif st.session_state.selected_model_type == "Code Model":
+        st.session_state.conversation_state["model_choice"] = "code"
+
+
     with st.spinner("Thinking..."):
         try:
             # Invoke the graph for one turn
@@ -263,6 +277,7 @@ if st.button("Clear Chat"):
     st.session_state.pending_image_display_text = None
     st.session_state.current_llm_hint = "Waiting for input..."
     st.session_state.file_uploader_key += 1 # Increment key to reset file uploader visually
+    st.session_state.selected_model_type = "Auto-route" # Reset radio button selection
     st.rerun()
 
 # --- Workflow Graph Visualization (in sidebar) ---
@@ -282,9 +297,22 @@ if st.session_state.show_graph:
         # Use use_container_width instead of use_column_width
         st.sidebar.image(graph_file_path, caption="Langgraph Workflow", use_container_width=True)
     else:
-        st.warning(f"Graph visualization not found at '{graph_file_path}'.")
-        st.info("Please ensure 'pygraphviz' and 'graphviz' are installed correctly on your system, and the application has run at least once to generate the graph image.")
-        st.markdown("For `graphviz`, you might need a system-wide installation (e.g., `brew install graphviz` on macOS, `sudo apt-get install graphviz` on Linux, or manual install on Windows).")
+        st.sidebar.warning(f"Graph visualization not found at '{graph_file_path}'.")
+        
+
+
+# --- Model Selection Radio Button (NEW) ---
+st.sidebar.markdown("---") # Separator
+st.sidebar.subheader("Force Model Selection")
+selected_option = st.sidebar.radio(
+    "Choose routing behavior:",
+    ("Auto-route", "Text Model", "Vision Model", "Code Model"),
+    key="model_selection_radio",
+    index=("Auto-route", "Text Model", "Vision Model", "Code Model").index(st.session_state.selected_model_type)
+)
+if selected_option != st.session_state.selected_model_type:
+    st.session_state.selected_model_type = selected_option
+    st.rerun() # Rerun if selection changes to update model_choice immediately
 
 # --- List Loaded Models ---
 st.sidebar.markdown("---") # Separator

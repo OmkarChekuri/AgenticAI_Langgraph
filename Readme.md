@@ -4,6 +4,18 @@ A multi-modal conversational agent built with [LangGraph](https://github.com/lan
 
 ---
 
+## Demo
+
+
+<video src="DynamicLanggraphAgentDemo.mp4" controls width="700"></video>
+
+https://user-images.githubusercontent.com/your-username/DynamicLanggraphAgentDemo.mp4
+
+Or download and watch:  
+[DynamicLanggraphAgentDemo.mp4](DynamicLanggraphAgentDemo.mp4)
+
+---
+
 ## Features
 
 - **Dynamic Routing:** Automatically detects if your query is text, code, or image and routes it to the appropriate model.
@@ -11,6 +23,8 @@ A multi-modal conversational agent built with [LangGraph](https://github.com/lan
 - **Interactive Web UI:** Powered by Streamlit for a modern chat experience.
 - **Workflow Visualization:** View the LangGraph workflow graph in the sidebar.
 - **Clear Chat:** Easily reset your conversation and state.
+- **Robust Error Handling:** User-friendly error messages and safe state resets if something goes wrong.
+- **UI State Management:** Chat history, model hints, and file uploaders are all managed for a smooth user experience.
 
 ---
 
@@ -39,7 +53,7 @@ A multi-modal conversational agent built with [LangGraph](https://github.com/lan
     source venv/bin/activate
     ```
 
-3. **Install dependencies:**
+3. **Install dependencies inside the virtual environment:**
     ```sh
     pip install -r requirements.txt
     ```
@@ -56,7 +70,7 @@ A multi-modal conversational agent built with [LangGraph](https://github.com/lan
     ollama pull qwen2.5-coder:7b
     ```
 
-5. **Run the Streamlit app:**
+6. **Run the Streamlit app:**
     ```sh
     streamlit run app.py
     ```
@@ -82,7 +96,8 @@ Type your message in the chat input or upload an image. The agent will respond a
 
 ## File Structure
 
-- `app.py` — Main Streamlit app for the conversational agent.
+- `app.py` — Main Streamlit app for the conversational agent.  
+  Includes robust error handling, chat clearing, and UI state management for a seamless user experience.
 - `langgraph_agent.py` — Contains the LangGraph workflow and agent logic, including routing and model selection.
 - `test_agent.py` — Unit and integration tests for the agent logic and workflow.
 - `requirements.txt` — Python dependencies.
@@ -91,7 +106,6 @@ Type your message in the chat input or upload an image. The agent will respond a
 
 ---
 
-
 ## Running Tests
 
 To run the test cases, make sure your virtual environment is activated, then type:
@@ -99,7 +113,7 @@ To run the test cases, make sure your virtual environment is activated, then typ
 python test_agent.py
 ```
 
-
+---
 
 ## License
 
