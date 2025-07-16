@@ -39,7 +39,7 @@ This project demonstrates a multi-modal conversational agent using [LangGraph](h
 
 4. **Run the agent:**
     ```sh
-    python 5.FullyImplementedSOlution.py
+    python 5.FullyImplementedSolution.py
     ```
 
 ## Usage
@@ -57,7 +57,7 @@ Type `exit` to quit the application.
 
 ## File Structure
 
-- [`5.FullyImplementedSOlution.py`](5.FullyImplementedSOlution.py): Main implementation of the agentic graph.
+- [`5.FullyImplementedSolution.py`](5.FullyImplementedSolution.py): Main implementation of the agentic graph.
 - [`requirements.txt`](requirements.txt): Python dependencies.
 - Other `.ipynb` and `.py` files: Experiments and earlier versions.
 
