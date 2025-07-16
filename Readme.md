@@ -42,7 +42,7 @@ This project is a multi-modal conversational agent built with [LangGraph](https:
 
 5. **Run the Streamlit app:**
     ```sh
-    streamlit run 6.FullyImplementedSolutionInStreamlit.py
+    python 5.FullyImplementedSOlution.py
     ```
 
 ## Usage
@@ -62,10 +62,10 @@ Type your message in the chat input or upload an image. The agent will respond a
 
 ## File Structure
 
-- `6.FullyImplementedSolutionInStreamlit.py` — Main Streamlit app.
-- `requirements.txt` — Python dependencies.
-- Other `.py` and `.ipynb` files — Experiments and earlier versions.
+- [`5.FullyImplementedSOlution.py`](5.FullyImplementedSOlution.py): Main implementation of the agentic graph.
+- [`requirements.txt`](requirements.txt): Python dependencies.
+- Other `.ipynb` and `.py` files: Experiments and earlier versions.
 
 ## License
 
-This project is licensed under the MIT License.
+This project is licensed under the MIT License. See [LICENSE](LICENSE)
