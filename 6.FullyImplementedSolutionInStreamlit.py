@@ -327,7 +327,7 @@ if user_query:
         text_content_lower = user_query.lower()
         
         # --- FIX: Corrected regex for web image URLs to include http:// ---
-        web_image_url_match = re.search(r'(https?:\/\/[^\s\/$.?#].[^\s]*?\.(jpg|jpeg|png|gif|bmp|tiff))', text_content_lower, re.IGNORECASE)
+        web_image_url_match = re.search(r'(https?:\/\/[^\s\/$.?#].[^\s]*?\.(jpg|jpeg|png|gif|bmp|svg|tiff))', text_content_lower, re.IGNORECASE)
         if web_image_url_match:
             detected_url = web_image_url_match.group(1)
             image_extension = web_image_url_match.group(2)
