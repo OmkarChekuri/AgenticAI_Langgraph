@@ -24,7 +24,7 @@ class GraphState(TypedDict):
 def load_llm_models():
     return {
         "llm_text": ChatOllama(model="llama3.2"),
-        "llm_vision": ChatOllama(model="gemma3"), # Reverted to gemma3 as per your request
+        "llm_vision": ChatOllama(model="gemma3"), # Retaining 'gemma3' as per your confirmation
         "llm_code": ChatOllama(model="qwen2.5-coder:7b")
     }
 
@@ -35,7 +35,7 @@ llm_code = llm_models["llm_code"]
 
 
 # ---- HELPER FUNCTIONS ----
-def encode_local_image_bytes(image_bytes: bytes) -> str:
+def encode_image_to_base64(image_bytes: bytes) -> str:
     """
     Encodes image bytes (from an uploaded file) to a base64 string.
     """
@@ -45,6 +45,7 @@ def fetch_and_encode_web_image(image_url: str) -> Union[str, None]:
     """
     Fetches an image from a URL and encodes it to a base64 string.
     """
+    print(f"Fetching and encoding web image from URL: {image_url}")
     try:
         response = httpx.get(image_url, follow_redirects=True, timeout=10)
         response.raise_for_status()
@@ -66,9 +67,22 @@ def text_node(state: GraphState) -> GraphState:
 
 def vision_node(state: GraphState) -> GraphState:
     print("---Entering VISION NODE---")
-    # st.write(f"Vision Node - Incoming Messages: {state['messages']}") # Debugging line, uncomment if needed
-    response = llm_vision.invoke(state["messages"])
-    state["messages"].append(AIMessage(content=response.content))
+    #print(f"Vision Node - Incoming Messages: {state['messages']}") # Commented out for cleaner output
+    try:
+        response = llm_vision.invoke(state["messages"])
+        if response and response.content:
+            #print("response from user:", response.content)  # Print the response content for debugging
+            state["messages"].append(AIMessage(content=response.content))
+        else:
+            # If response is empty or None, provide a fallback message
+            state["messages"].append(AIMessage(content="Vision model did not provide a clear response. It might be struggling to interpret the image or the query."))
+            print("Warning: Vision model returned empty or no content.")
+    except Exception as e:
+        # Catch any exceptions during vision model invocation
+        error_message = f"An error occurred while processing the image with the vision model: {e}. Please ensure the model is running and compatible with the image format."
+        state["messages"].append(AIMessage(content=error_message))
+        st.error(error_message) # Display error in Streamlit UI
+        print(f"Error in vision_node: {e}")
     return state
 
 def code_node(state: GraphState) -> GraphState:
@@ -116,10 +130,11 @@ def llm_router_node(state: GraphState) -> GraphState:
         state["next_node_hint"] = "text_handler"
 
     print(f"LLM Router decided next hint: {state['next_node_hint']}")
+    st.session_state.current_llm_hint = state['next_node_hint'] # Update hint immediately
     return state
 
 
-# ---- PREPROCESSING AND ROUTING NODE (Handles Uploaded, Local, and Web Images) ----
+# ---- PREPROCESSING AND ROUTING NODE (Simplified for Streamlit Integration) ----
 def preprocess_and_route_node(state: GraphState) -> GraphState:
     print("---Entering PREPROCESS AND ROUTE NODE---")
     last_msg = state["messages"][-1]
@@ -128,108 +143,38 @@ def preprocess_and_route_node(state: GraphState) -> GraphState:
         state["model_choice"] = "auto"
 
     next_hint_from_preprocess = None
-    image_processed = False
-
-    # --- NEW: Handle uploaded image from Streamlit session state ---
-    if st.session_state.get("uploaded_image_data") and st.session_state.get("uploaded_image_mime_type"):
-        # Create a multimodal message from the uploaded image
-        # Use existing text content if available, otherwise a default prompt
-        text_part = last_msg.content if isinstance(last_msg.content, str) else "Describe this image:"
-        new_content = [
-            {"type": "text", "text": text_part},
-            {"type": "image_url", "image_url": {"url": f"data:{st.session_state.uploaded_image_mime_type};base64,{st.session_state.uploaded_image_data}"}},
-        ]
-        state["messages"][-1] = HumanMessage(content=new_content)
-        image_processed = True
-        print("Uploaded image processed and message updated.")
-        # Clear uploaded image data from session state after processing
-        st.session_state.uploaded_image_data = None
-        st.session_state.uploaded_image_mime_type = None
-
-    # If no uploaded image, proceed with text-based image detection (local/web)
-    if not image_processed and isinstance(last_msg, HumanMessage) and isinstance(last_msg.content, str):
-        text_content = last_msg.content
-
-        # 1. Check for LOCAL image file paths
-        local_file_path_match = re.search(
-            r'(file://)?'                                 
-            r'('                                           
-            r'(?:[a-zA-Z]:[\\/]|[\/])'                     
-            r'(?:[^<>:"|?*\\/]+\\?)*'                  
-            r'[^<>:"|?*\\/]*'                             
-            r'\.'                                         
-            r'(jpg|jpeg|png|gif|bmp|tiff)'                
-            r')'                                           
-            r'$',                                          
-            text_content,
-            re.IGNORECASE
-        )
-
-        if local_file_path_match:
-            detected_path = local_file_path_match.group(2)
-            image_extension = local_file_path_match.group(3)
-            print(f"Detected potential local image file path: {detected_path}")
-            
-            try: # Added try-except for file reading
-                base64_img = encode_local_image_bytes(open(detected_path, "rb").read()) # Read local file bytes
-                if base64_img:
-                    new_text_part = text_content.replace(local_file_path_match.group(0), "").strip() or "Describe this image:"
-                    new_content = [
-                        {"type": "text", "text": new_text_part},
-                        {"type": "image_url", "image_url": {"url": f"data:image/{image_extension};base64,{base64_img}"}},
-                    ]
-                    state["messages"][-1] = HumanMessage(content=new_content)
-                    image_processed = True
-                    print(f"Local image encoded and message updated.")
-                else:
-                    st.warning("Failed to encode local image from path.")
-            except FileNotFoundError:
-                st.warning(f"Local image file not found: {detected_path}")
-            except Exception as e:
-                st.warning(f"Error processing local image: {e}")
-
-
-        # 2. Check for WEB image URLs (only if no local image was found and processed)
-        if not image_processed:
-            web_image_url_match = re.search(r'(https?:\/\/[^\s\/$.?#].[^\s]*?\.(jpg|jpeg|png|gif|bmp|tiff))', text_content, re.IGNORECASE)
-            if web_image_url_match:
-                detected_url = web_image_url_match.group(1)
-                image_extension = web_image_url_match.group(2)
-                print(f"Detected potential web image URL: {detected_url}")
-                
-                base64_img = fetch_and_encode_web_image(detected_url)
-                if base64_img:
-                    new_text_part = text_content.replace(web_image_url_match.group(0), "").strip() or "Describe this image:"
-                    new_content = [
-                        {"type": "text", "text": new_text_part},
-                        {"type": "image_url", "image_url": {"url": f"data:image/{image_extension};base64,{base64_img}"}},
-                    ]
-                    state["messages"][-1] = HumanMessage(content=new_content)
-                    image_processed = True
-                    print(f"Web image encoded and message updated.")
-                else:
-                    st.warning("Failed to fetch or encode web image.")
     
-    # Now that image preprocessing is done, determine the next hint based on model_choice or LLM routing
-    if state.get("model_choice") == "code":
-        next_hint_from_preprocess = "code_handler"
-        state["model_choice"] = "auto"
-    elif state.get("model_choice") == "vision":
-        next_hint_from_preprocess = "vision_handler"
-        state["model_choice"] = "auto"
-    elif image_processed: # If an image was processed (uploaded, local, or web), directly route to vision_handler
-        next_hint_from_preprocess = "vision_handler"
-        print("Image successfully processed, directly routing to VISION HANDLER.")
-    else:
-        # If no explicit model_choice AND no image was processed,
-        # then delegate to the LLM router for text/code keyword classification.
-        next_hint_from_preprocess = "llm_router_node"
-        # Optional: Check for code keywords here to influence LLM router's decision if needed.
-        # The LLM router's prompt is designed to handle this from text content.
+    # Check if the message is already multimodal (meaning image was processed by UI logic)
+    # This is the primary way image inputs are identified in the Langgraph workflow now.
+    if isinstance(last_msg, HumanMessage) and isinstance(last_msg.content, list):
+        for part in last_msg.content:
+            if isinstance(part, dict) and part.get("type") == "image_url":
+                next_hint_from_preprocess = "vision_handler"
+                print("Multimodal message with image detected (from UI preprocessing), directly routing to VISION HANDLER.")
+                break
+
+    # If no direct routing via image detection, proceed with explicit model_choice or LLM routing
+    if next_hint_from_preprocess is None:
+        if state.get("model_choice") == "code":
+            next_hint_from_preprocess = "code_handler"
+            state["model_choice"] = "auto"
+        elif state.get("model_choice") == "vision":
+            next_hint_from_preprocess = "vision_handler"
+            state["model_choice"] = "auto"
+        else:
+            # If no explicit model_choice AND no image was pre-processed by UI,
+            # then delegate to the LLM router for text/code keyword classification.
+            next_hint_from_preprocess = "llm_router_node"
+            if isinstance(last_msg, HumanMessage) and isinstance(last_msg.content, str):
+                code_keywords = ["code", "program", "function", "script", "develop", "implement", "write in",
+                                 "python", "javascript", "java", "c++", "html", "css", "sql", "bash"]
+                if any(keyword in last_msg.content.lower() for keyword in code_keywords):
+                    print("Code keywords detected, routing to LLM Router for decision.")
 
 
     state["next_node_hint"] = next_hint_from_preprocess
     print(f"Preprocess node decided next hint: {next_hint_from_preprocess}")
+    st.session_state.current_llm_hint = state['next_node_hint'] # Update hint immediately
     return state
 
 
@@ -300,13 +245,19 @@ if "conversation_state" not in st.session_state:
         "model_choice": "auto",
         "next_node_hint": "text_handler"
     }
-if "uploaded_image_data" not in st.session_state:
-    st.session_state.uploaded_image_data = None
-if "uploaded_image_mime_type" not in st.session_state:
-    st.session_state.uploaded_image_mime_type = None
-# Initialize new session state for displaying current LLM hint
+# Temporary storage for image data uploaded/detected in the current turn, awaiting text prompt
+if "pending_image_data" not in st.session_state:
+    st.session_state.pending_image_data = None
+if "pending_image_mime_type" not in st.session_state:
+    st.session_state.pending_image_mime_type = None
+if "pending_image_display_text" not in st.session_state:
+    st.session_state.pending_image_display_text = None
 if "current_llm_hint" not in st.session_state:
     st.session_state.current_llm_hint = "Waiting for input..."
+# Key for file uploader to allow resetting it
+if "file_uploader_key" not in st.session_state:
+    st.session_state.file_uploader_key = 0
+
 
 # --- Display Chat Messages ---
 chat_container = st.container(height=400, border=True)
@@ -325,46 +276,122 @@ with chat_container:
                             elif part.get("type") == "image_url":
                                 image_url_data = part.get("image_url", {}).get("url")
                                 if image_url_data and image_url_data.startswith("data:image"):
-                                    st.image(image_url_data, caption="Uploaded Image", width=200)
+                                    st.image(image_url_data, caption="User provided image", width=200)
                                 else:
                                     st.markdown(f"Image URL: {image_url_data}") # Fallback for non-data URLs
         elif isinstance(message, AIMessage):
             with st.chat_message("assistant"):
                 st.markdown(message.content)
 
+# --- Image Upload ---
+# Use a key to allow programmatic resetting of the uploader
+uploaded_file = st.file_uploader("Upload an image:", type=["png", "jpg", "jpeg", "gif", "bmp", "tiff"], key=f"file_uploader_{st.session_state.file_uploader_key}")
+
+# --- Process Uploaded File ---
+if uploaded_file is not None and st.session_state.pending_image_data is None:
+    # Only process if a new file is uploaded and no image is currently pending
+    image_bytes = uploaded_file.read()
+    st.session_state.pending_image_data = encode_image_to_base64(image_bytes)
+    st.session_state.pending_image_mime_type = uploaded_file.type
+    st.session_state.pending_image_display_text = f"Uploaded Image: {uploaded_file.name}"
+    st.session_state.messages.append(HumanMessage(content=f"Image uploaded. Please type your query and press Enter."))
+    st.rerun() # Rerun to show the "Image uploaded" message and clear the uploader widget visually
+
 # --- User Input Area ---
 user_query = st.chat_input("Type your message here...")
-
-# --- Image Upload ---
-uploaded_file = st.file_uploader("Or upload an image:", type=["png", "jpg", "jpeg", "gif", "bmp", "tiff"])
 
 # Display the current LLM hint
 st.info(f"Current LLM: {st.session_state.current_llm_hint.replace('_handler', '').replace('_node', '').title()}")
 
 
-if uploaded_file is not None:
-    # Read image bytes and store in session state
-    image_bytes = uploaded_file.read()
-    st.session_state.uploaded_image_data = encode_local_image_bytes(image_bytes)
-    st.session_state.uploaded_image_mime_type = uploaded_file.type
-    
-    # Add a placeholder message to trigger the graph processing
-    # The actual image data is in session_state, preprocess_and_route_node will pick it up
-    st.session_state.messages.append(HumanMessage(content=f"Image uploaded: {uploaded_file.name}"))
-    user_query = "Describe the uploaded image." # Use a default text query to accompany the image
-
-# --- Process User Input ---
+# --- Main Processing Logic (triggered by user_query submission) ---
 if user_query:
-    # Append user's message to display history (if not already added by file uploader)
-    if not st.session_state.messages or st.session_state.messages[-1].content != user_query:
-        # If it's a new text query or not an image upload, add it to history
-        if not (uploaded_file is not None and user_query == "Describe the uploaded image."):
-             st.session_state.messages.append(HumanMessage(content=user_query))
+    final_human_message_content = user_query
+    image_source_display_text = None
+
+    # 1. Check for pending uploaded image
+    if st.session_state.pending_image_data:
+        final_human_message_content = [
+            {"type": "text", "text": user_query},
+            {"type": "image_url", "image_url": {"url": f"data:{st.session_state.pending_image_mime_type};base64,{st.session_state.pending_image_data}"}},
+        ]
+        image_source_display_text = st.session_state.pending_image_display_text
+        # Clear pending image data after it's used
+        st.session_state.pending_image_data = None
+        st.session_state.pending_image_mime_type = None
+        st.session_state.pending_image_display_text = None
+        # Increment uploader key to visually reset it
+        st.session_state.file_uploader_key += 1
+        
+    else: # 2. Check for web/local image URLs in text query
+        text_content_lower = user_query.lower()
+        
+        # --- FIX: Corrected regex for web image URLs to include http:// ---
+        web_image_url_match = re.search(r'(https?:\/\/[^\s\/$.?#].[^\s]*?\.(jpg|jpeg|png|gif|bmp|tiff))', text_content_lower, re.IGNORECASE)
+        if web_image_url_match:
+            detected_url = web_image_url_match.group(1)
+            image_extension = web_image_url_match.group(2)
+            st.info(f"Detected web image URL: {detected_url}")
+            base64_img = fetch_and_encode_web_image(detected_url)
+            if base64_img:
+                final_human_message_content = [
+                    {"type": "text", "text": user_query.replace(web_image_url_match.group(0), "").strip() + ", also don't infer anything from the path name" or "Describe this image, also don't infer anything from the path name:"},
+                    {"type": "image_url", "image_url": {"url": f"data:image/{image_extension};base64,{base64_img}"}},
+                ]
+                image_source_display_text = f"Web Image: {detected_url}"
+            else:
+                st.warning("Failed to fetch or encode web image.")
+                final_human_message_content = user_query
+                image_source_display_text = None
+        else: # Only check for local file paths if no web URL was found
+            local_file_path_match = re.search(
+                r'(file://)?'                                 
+                r'('                                           
+                r'(?:[a-zA-Z]:[\\/]|[\/])'                     
+                r'(?:[^<>:"|?*\\/]+\\?)*'                  
+                r'[^<>:"|?*\\/]*'                             
+                r'\.'                                         
+                r'(jpg|jpeg|png|gif|bmp|tiff)'                
+                r')'                                           
+                r'$',                                          
+                text_content_lower,
+                re.IGNORECASE
+            )
+
+            if local_file_path_match:
+                detected_path = local_file_path_match.group(2)
+                image_extension = local_file_path_match.group(3)
+                st.info(f"Detected local image path: {detected_path}")
+                try:
+                    image_bytes_from_path = open(detected_path, "rb").read()
+                    base64_img = encode_image_to_base64(image_bytes_from_path)
+                    final_human_message_content = [
+                        {"type": "text", "text": user_query.replace(local_file_path_match.group(0), "").strip() + ", also, don't infer anything from the path name" or "Describe this image, also, don't infer anything from the path name:"},
+                        {"type": "image_url", "image_url": {"url": f"data:image/{image_extension};base64,{base64_img}"}},
+                    ]
+                    image_source_display_text = f"Local Image: {detected_path}"
+                except FileNotFoundError:
+                    st.error(f"Local image file not found: {detected_path}. Please ensure the path is correct and accessible.")
+                    final_human_message_content = user_query
+                    image_source_display_text = None
+                except Exception as e:
+                    st.error(f"Error processing local image: {e}")
+                    final_human_message_content = user_query
+                    image_source_display_text = None
+
+
+
+    # Add the user's message (potentially multimodal) to display history
+    st.session_state.messages.append(HumanMessage(content=final_human_message_content))
+    if image_source_display_text:
+        # Optionally, add a small info message about the image source below the user's message
+        with chat_container: # Re-enter container to append
+            with st.chat_message("user"):
+                st.caption(image_source_display_text)
+
 
     # Update the Langgraph conversation state with the new user message
-    # If an image was uploaded, the HumanMessage content will be updated by preprocess_and_route_node
-    # If not, it will be the plain text query.
-    st.session_state.conversation_state["messages"].append(HumanMessage(content=user_query))
+    st.session_state.conversation_state["messages"].append(HumanMessage(content=final_human_message_content))
 
     with st.spinner("Thinking..."):
         try:
@@ -383,7 +410,7 @@ if user_query:
             st.warning("Please try again.")
             # Optionally, remove the last user message from Langgraph state to avoid re-processing
             if st.session_state.conversation_state["messages"] and isinstance(st.session_state.conversation_state["messages"][-1], HumanMessage):
-                conversation_state["messages"].pop() # Fix: use conversation_state, not st.session_state.conversation_state
+                st.session_state.conversation_state["messages"].pop()
                 
     st.rerun() # Rerun to update chat display
 
@@ -396,9 +423,11 @@ if st.button("Clear Chat"):
         "model_choice": "auto",
         "next_node_hint": "text_handler"
     }
-    st.session_state.uploaded_image_data = None
-    st.session_state.uploaded_image_mime_type = None
-    st.session_state.current_llm_hint = "Waiting for input..." # Reset hint
+    st.session_state.pending_image_data = None
+    st.session_state.pending_image_mime_type = None
+    st.session_state.pending_image_display_text = None
+    st.session_state.current_llm_hint = "Waiting for input..."
+    st.session_state.file_uploader_key += 1 # Increment key to reset file uploader visually
     st.rerun()
 
 # --- Workflow Graph Visualization (in sidebar) ---
@@ -415,4 +444,3 @@ with st.sidebar.expander("Show Graph"):
         st.warning(f"Could not draw graph: {e}")
         st.info("Please ensure 'pygraphviz' and 'graphviz' are installed correctly on your system.")
         st.markdown("For `graphviz`, you might need a system-wide installation (e.g., `brew install graphviz` on macOS, `sudo apt-get install graphviz` on Linux, or manual install on Windows).")
-
