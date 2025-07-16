@@ -38,7 +38,7 @@ def encode_image_to_base64(image_bytes: bytes) -> str:
 
 def fetch_and_encode_web_image(image_url: str) -> Union[str, None]:
     """Fetches an image from a URL and encodes it to a base64 string."""
-    print(f"Fetching and encoding web image from URL: {image_url}") # For console debugging
+    #print(f"Fetching and encoding web image from URL: {image_url}") # For console debugging
     try:
         response = httpx.get(image_url, follow_redirects=True, timeout=10)
         response.raise_for_status()
@@ -56,23 +56,24 @@ def text_node(state: GraphState) -> GraphState:
     """Processes the message using the text-capable LLM."""
     print("---Entering TEXT NODE---")
     response = llm_text.invoke(state["messages"])
-    state["messages"].append(AIMessage(content=response.content))
+    # Store the hint that led to this node in additional_kwargs
+    state["messages"].append(AIMessage(content=response.content, additional_kwargs={"llm_hint": "text_handler"}))
     return state
 
 def vision_node(state: GraphState) -> GraphState:
     """Processes the message using the vision-capable LLM."""
     print("---Entering VISION NODE---")
-    print(f"Vision Node - Incoming Messages: {state['messages']}") # Debugging line
+    #print(f"Vision Node - Incoming Messages: {state['messages']}") # Debugging line
     try:
         response = llm_vision.invoke(state["messages"])
         if response and response.content:
-            state["messages"].append(AIMessage(content=response.content))
+            state["messages"].append(AIMessage(content=response.content, additional_kwargs={"llm_hint": "vision_handler"}))
         else:
-            state["messages"].append(AIMessage(content="Vision model did not provide a clear response. It might be struggling to interpret the image or the query."))
+            state["messages"].append(AIMessage(content="Vision model did not provide a clear response. It might be struggling to interpret the image or the query.", additional_kwargs={"llm_hint": "vision_handler_fallback"}))
             print("Warning: Vision model returned empty or no content.")
     except Exception as e:
         error_message = f"An error occurred while processing the image with the vision model: {e}. Please ensure the model is running and compatible with the image format."
-        state["messages"].append(AIMessage(content=error_message))
+        state["messages"].append(AIMessage(content=error_message, additional_kwargs={"llm_hint": "vision_handler_error"}))
         st.error(error_message)
         print(f"Error in vision_node: {e}")
     return state
@@ -81,7 +82,7 @@ def code_node(state: GraphState) -> GraphState:
     """Processes the message using the code-capable LLM."""
     print("---Entering CODE NODE---")
     response = llm_code.invoke(state["messages"])
-    state["messages"].append(AIMessage(content=response.content))
+    state["messages"].append(AIMessage(content=response.content, additional_kwargs={"llm_hint": "code_handler"}))
     return state
 
 def llm_router_node(state: GraphState) -> GraphState:

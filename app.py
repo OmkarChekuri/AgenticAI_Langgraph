@@ -1,3 +1,7 @@
+# app.py
+"""
+Dynamic Langgraph Agent Application
+"""
 import streamlit as st
 import re
 import io # For graph image bytes
@@ -9,7 +13,7 @@ from langgraph_agent import (
     compile_langgraph_workflow,
     encode_image_to_base64,
     fetch_and_encode_web_image,
-    llm_models # <--- NEW: Import llm_models dictionary
+    llm_models # Import llm_models dictionary
 )
 from langchain_core.messages import HumanMessage, AIMessage # For message types
 
@@ -34,6 +38,17 @@ def get_display_llm_name(hint: str) -> str:
         model_id = llm_models["llm_code"].model
     elif base_name == "llm_router": # The router itself uses llm_text
          model_id = llm_models["llm_text"].model
+    elif base_name.endswith("_error") or base_name.endswith("_fallback"): # Handle error/fallback hints
+        # Extract the original handler name, e.g., "vision_handler_error" -> "vision"
+        original_handler = base_name.split('_')[0]
+        if original_handler == "vision":
+            model_id = llm_models["llm_vision"].model
+        elif original_handler == "text":
+            model_id = llm_models["llm_text"].model
+        elif original_handler == "code":
+            model_id = llm_models["llm_code"].model
+        
+        display_name = f"{original_handler.title()} (Error/Fallback)" # More descriptive
     
     if model_id:
         return f"{display_name} ({model_id})"
@@ -44,7 +59,7 @@ def get_display_llm_name(hint: str) -> str:
 
 st.set_page_config(page_title="Dynamic Langgraph Agent", layout="centered")
 
-st.title("🤖 Dynamic Langgraph Agent")
+st.title(" Dynamic Langgraph Agent")
 st.markdown("""
 This agent can dynamically route your queries to different LLMs (Text, Vision, Code)
 based on your input. You can type questions, ask for code, or provide image URLs/upload images!
@@ -90,12 +105,17 @@ with chat_container:
                             elif part.get("type") == "image_url":
                                 image_url_data = part.get("image_url", {}).get("url")
                                 if image_url_data and image_url_data.startswith("data:image"):
-                                    st.image(image_url_data, caption="Uploaded Image", width=200)
+                                    st.image(image_url_data, caption="User provided image", width=200)
                                 else:
                                     st.markdown(f"Image URL: {image_url_data}") # Fallback for non-data URLs
         elif isinstance(message, AIMessage):
             with st.chat_message("assistant"):
-                st.markdown(message.content)
+                # Display LLM name next to bot icon
+                llm_hint_for_display = message.additional_kwargs.get("llm_hint")
+                if llm_hint_for_display:
+                    display_llm_name = get_display_llm_name(llm_hint_for_display)
+                    st.markdown(f"**{display_llm_name}**") # Display the LLM name
+                st.markdown(message.content) # Display the actual response
 
 # --- Image Upload ---
 # Use a key to allow programmatic resetting of the uploader
@@ -115,7 +135,7 @@ if uploaded_file is not None and st.session_state.pending_image_data is None:
 user_query = st.chat_input("Type your message here...")
 
 # Display the current LLM hint
-st.info(f"Current LLM: {get_display_llm_name(st.session_state.current_llm_hint)}") # <--- UPDATED LINE
+st.info(f"Current LLM: {get_display_llm_name(st.session_state.current_llm_hint)}")
 
 
 # --- Main Processing Logic (triggered by user_query submission) ---
