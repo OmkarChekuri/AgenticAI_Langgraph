@@ -2,6 +2,9 @@
 
 A dynamic, multimodal AI agent using [LangGraph](https://github.com/langchain-ai/langgraph), integrated with a user-friendly Streamlit web interface. The agent can intelligently route user queries to specialized Large Language Models (LLMs) for text generation, code assistance, or image understanding.
 
+**Demo hardware:**  
+_This application is run on a laptop with an Intel i7 7th Gen CPU, NVIDIA RTX 3060TI GPU, and 16GB RAM._
+
 ---
 
 ## Demo
@@ -32,10 +35,11 @@ The following diagram illustrates the internal workflow of the app, showing how 
 - **Multimodal Input:** Accepts text queries, direct image uploads, and image URLs (both web and local file paths).
 - **Dynamic LLM Routing:**
   - **Automated Routing:** Intelligently identifies the intent of the user's query (text, vision, or code) and routes it to the most appropriate specialized LLM.
+  - **LLM-Driven Classification:** For automated routing, the `llm_router_node` uses the `llama3.2` text model to classify the user's query. It constructs a specific prompt asking `llama3.2` to determine if the query primarily requires a 'text', 'vision', or 'code' model, and to respond with only one word. This decision then guides the LangGraph workflow to the correct specialized handler.
   - **Forced Routing:** Allows users to explicitly select a specific LLM (Text, Vision, or Code) to bypass automatic routing for a given turn.
-- **Specialized LLMs:** Leverages different Ollama models for distinct tasks:
-  - `llama3.2` for general text and routing decisions.
-  - `gemma3` (or `llava`) for image understanding.
+- **LLMs:** Leverages different Ollama models for distinct tasks:
+  - `llama3.2:3b` for general text and routing decisions.
+  - `gemma3:4b`  for image understanding.
   - `qwen2.5-coder:7b` for code-related queries.
 - **Interactive Streamlit UI:** Provides a chat-like interface for seamless interaction.
 - **Real-time Feedback:** Displays the currently active LLM, loading indicators, and informative messages.
