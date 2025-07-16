@@ -89,7 +89,7 @@ if "show_graph" not in st.session_state:
 
 
 # --- Display Chat Messages ---
-chat_container = st.container(height=400, border=True)
+chat_container = st.container(height=250, border=True)
 with chat_container:
     for message in st.session_state.messages:
         if isinstance(message, HumanMessage):
@@ -105,7 +105,7 @@ with chat_container:
                             elif part.get("type") == "image_url":
                                 image_url_data = part.get("image_url", {}).get("url")
                                 if image_url_data and image_url_data.startswith("data:image"):
-                                    st.image(image_url_data, caption="Uploaded Image", width=200)
+                                    st.image(image_url_data, caption="Uploaded Image", width=100)
                                 else:
                                     st.markdown(f"Image URL: {image_url_data}") # Fallback for non-data URLs
         elif isinstance(message, AIMessage):
