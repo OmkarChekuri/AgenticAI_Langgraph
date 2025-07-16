@@ -7,9 +7,7 @@ A multi-modal conversational agent built with [LangGraph](https://github.com/lan
 ## Demo
 
 
-<video src="DynamicLanggraphAgentDemo.mp4" controls width="700"></video>
-
-https://user-images.githubusercontent.com/your-username/DynamicLanggraphAgentDemo.mp4
+![DynamicLanggraphAgentDemo](DynamicLanggraphAgentDemo.gif)
 
 Or download and watch:  
 [DynamicLanggraphAgentDemo.mp4](DynamicLanggraphAgentDemo.mp4)
