@@ -44,6 +44,8 @@ def encode_local_image(image_path: str) -> Union[str, None]:
     Returns:
         The base64 encoded string of the image, or None if an error occurs.
     """
+
+    print(f"Encoding local image from path: {image_path}")
     try:
         with open(image_path, "rb") as image_file:
             return base64.b64encode(image_file.read()).decode('utf-8')
