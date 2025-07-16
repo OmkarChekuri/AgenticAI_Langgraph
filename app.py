@@ -1,11 +1,8 @@
-# app.py
-"""
-Dynamic Langgraph Agent Application
-"""
 import streamlit as st
 import re
 import io # For graph image bytes
 import base64 # For image encoding in UI
+import os # Import os for path checking
 
 # Import the Langgraph agent components and the llm_models dictionary
 from langgraph_agent import (
@@ -59,7 +56,7 @@ def get_display_llm_name(hint: str) -> str:
 
 st.set_page_config(page_title="Dynamic Langgraph Agent", layout="centered")
 
-st.title(" Dynamic Langgraph Agent")
+st.title("🤖 Dynamic Langgraph Agent")
 st.markdown("""
 This agent can dynamically route your queries to different LLMs (Text, Vision, Code)
 based on your input. You can type questions, ask for code, or provide image URLs/upload images!
@@ -86,6 +83,9 @@ if "current_llm_hint" not in st.session_state:
 # Key for file uploader to allow resetting it
 if "file_uploader_key" not in st.session_state:
     st.session_state.file_uploader_key = 0
+# Session state for graph visibility
+if "show_graph" not in st.session_state:
+    st.session_state.show_graph = True # Default to True to show graph by default
 
 
 # --- Display Chat Messages ---
@@ -105,7 +105,7 @@ with chat_container:
                             elif part.get("type") == "image_url":
                                 image_url_data = part.get("image_url", {}).get("url")
                                 if image_url_data and image_url_data.startswith("data:image"):
-                                    st.image(image_url_data, caption="User provided image", width=200)
+                                    st.image(image_url_data, caption="Uploaded Image", width=200)
                                 else:
                                     st.markdown(f"Image URL: {image_url_data}") # Fallback for non-data URLs
         elif isinstance(message, AIMessage):
@@ -267,15 +267,28 @@ if st.button("Clear Chat"):
 
 # --- Workflow Graph Visualization (in sidebar) ---
 st.sidebar.header("Workflow Graph")
-with st.sidebar.expander("Show Graph"):
-    try:
-        # Draw the graph to an in-memory BytesIO object
-        graph_bytes_io = io.BytesIO()
-        graph.get_graph().draw_png(graph_bytes_io, prog="dot") # Use 'dot' program for layout
-        graph_bytes_io.seek(0) # Rewind to the beginning of the BytesIO object
 
-        st.image(graph_bytes_io, caption="Langgraph Workflow", use_column_width=True)
-    except Exception as e:
-        st.warning(f"Could not draw graph: {e}")
-        st.info("Please ensure 'pygraphviz' and 'graphviz' are installed correctly on your system.")
+# Toggle button for graph visibility
+if st.sidebar.button("Hide Graph" if st.session_state.show_graph else "Show Graph"):
+    st.session_state.show_graph = not st.session_state.show_graph
+    st.rerun() # Rerun to apply visibility change
+
+if st.session_state.show_graph:
+    # Define the path where the graph image is saved
+    graph_file_path = "langgraph_workflow.png"
+    
+    # Check if the file exists before trying to display it
+    if os.path.exists(graph_file_path):
+        # Use use_container_width instead of use_column_width
+        st.sidebar.image(graph_file_path, caption="Langgraph Workflow", use_container_width=True)
+    else:
+        st.warning(f"Graph visualization not found at '{graph_file_path}'.")
+        st.info("Please ensure 'pygraphviz' and 'graphviz' are installed correctly on your system, and the application has run at least once to generate the graph image.")
         st.markdown("For `graphviz`, you might need a system-wide installation (e.g., `brew install graphviz` on macOS, `sudo apt-get install graphviz` on Linux, or manual install on Windows).")
+
+# --- List Loaded Models ---
+st.sidebar.markdown("---") # Separator
+st.sidebar.subheader("Loaded LLM Models")
+for llm_key, llm_instance in llm_models.items():
+    model_type = llm_key.replace("llm_", "").title()
+    st.sidebar.markdown(f"- **{model_type}**: `{llm_instance.model}`")

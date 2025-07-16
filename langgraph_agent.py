@@ -3,6 +3,8 @@ import re
 from typing import TypedDict, List, Literal, Union
 import httpx
 import streamlit as st # Streamlit is imported here for st.error/st.warning in helper functions
+import io # For BytesIO when drawing graph
+import os # For path operations when saving graph
 
 from langchain_community.chat_models import ChatOllama
 from langchain_core.messages import HumanMessage, AIMessage
@@ -38,7 +40,7 @@ def encode_image_to_base64(image_bytes: bytes) -> str:
 
 def fetch_and_encode_web_image(image_url: str) -> Union[str, None]:
     """Fetches an image from a URL and encodes it to a base64 string."""
-    #print(f"Fetching and encoding web image from URL: {image_url}") # For console debugging
+    print(f"Fetching and encoding web image from URL: {image_url}") # For console debugging
     try:
         response = httpx.get(image_url, follow_redirects=True, timeout=10)
         response.raise_for_status()
@@ -63,7 +65,7 @@ def text_node(state: GraphState) -> GraphState:
 def vision_node(state: GraphState) -> GraphState:
     """Processes the message using the vision-capable LLM."""
     print("---Entering VISION NODE---")
-    #print(f"Vision Node - Incoming Messages: {state['messages']}") # Debugging line
+    print(f"Vision Node - Incoming Messages: {state['messages']}") # Debugging line
     try:
         response = llm_vision.invoke(state["messages"])
         if response and response.content:
@@ -182,7 +184,7 @@ def route_decision(state: GraphState) -> Literal["vision_handler", "text_handler
 # ---- LANGGRAPH WORKFLOW COMPILATION ----
 @st.cache_resource
 def compile_langgraph_workflow():
-    """Compiles the Langgraph workflow."""
+    """Compiles the Langgraph workflow and saves its visualization."""
     workflow = StateGraph(GraphState)
 
     workflow.add_node("preprocess_and_route_node", preprocess_and_route_node)
@@ -218,5 +220,20 @@ def compile_langgraph_workflow():
     workflow.add_edge("vision_handler", END)
     workflow.add_edge("code_handler", END)
 
-    return workflow.compile()
+    compiled_graph = workflow.compile()
+
+    # --- NEW: Save graph visualization locally ---
+    graph_file_path = "langgraph_workflow.png"
+    try:
+        # Use draw_mermaid_png() which is often preferred for its output style
+        # It returns bytes, so we write them directly to a file
+        mermaid_png_bytes = compiled_graph.get_graph().draw_mermaid_png()
+        with open(graph_file_path, "wb") as f:
+            f.write(mermaid_png_bytes)
+        print(f"Graph visualization saved as {graph_file_path}")
+    except Exception as e:
+        print(f"Warning: Could not save graph visualization. Ensure 'pygraphviz' and 'graphviz' are installed. Error: {e}")
+    # --- END NEW ---
+
+    return compiled_graph
 
