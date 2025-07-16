@@ -79,7 +79,7 @@ my_agent_project/
 
 - **Python 3.9+**
 - **Ollama:** Download and install from [ollama.com](https://ollama.com/). Ensure the Ollama server is running in the background.
-- **Graphviz:** Required for workflow visualization.
+
 
 ### Installation Steps
 
@@ -103,18 +103,7 @@ my_agent_project/
     pip install -r requirements.txt
     ```
 
-4. **Install Graphviz (system-level software):**
-    - **macOS:** `brew install graphviz`
-    - **Ubuntu/Debian:**  
-      ```sh
-      sudo apt-get update
-      sudo apt-get install graphviz
-      ```
-    - **Windows:**  
-      Download and run the installer from [Graphviz Download Page](https://graphviz.org/download/).  
-      **Important:** During installation, select "Add Graphviz to the system PATH for all users." If you skip this, manually add the Graphviz `bin` directory to your system's PATH.
-
-5. **Download Ollama models:**
+4. **Download Ollama models:**
     ```sh
     ollama pull llama3.2
     ollama pull gemma3
